@@ -302,8 +302,11 @@ class EventQueue
       # We can't cancel pending requests, but we can ignore the response if
       # window already closed
       if @queue
-        @enqueue ->
-          callback error, response
+        if options.async
+            @enqueue ->
+              callback error, response
+        else
+            callback error, response
         @expecting.splice(@expecting.indexOf(done), 1)
         done()
     return

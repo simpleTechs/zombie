@@ -61,9 +61,6 @@ class XMLHttpRequest
   # Calling this method an already active request (one for which open()or
   # openRequest()has already been called) is the equivalent of calling abort().
   open: (method, url, async, user, password)->
-    if async == false
-      throw new HTML.DOMException(HTML.NOT_SUPPORTED_ERR, "Zombie does not support synchronous XHR requests")
-
     # Abort any pending request.
     @abort()
 
@@ -100,6 +97,7 @@ class XMLHttpRequest
       method:   method
       url:      URL.format(url)
       headers:  {}
+      async:    async
     @_pending.push(request)
     @_stateChanged(XMLHttpRequest.OPENED)
     return
@@ -134,12 +132,17 @@ class XMLHttpRequest
 
       # Give the onreadystatechange a chance to fire from the previous state
       # change, then set the response fields and change the state to DONE.
-      @_window._eventQueue.enqueue =>
+      extractBody = =>
         @responseText = response.body?.toString() || ""
         @responseXML = null
         @onload.call(@) if @onload
         @_stateChanged(XMLHttpRequest.DONE)
-
+       
+      if request["async"]
+        @_window._eventQueue.enqueue extractBody
+      else
+        extractBody()
+  
     return
 
   # Sets the value of an HTTP request header.You must call setRequestHeader()

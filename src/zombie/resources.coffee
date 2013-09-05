@@ -23,6 +23,7 @@ QS      = require("querystring")
 Request = require("request")
 URL     = require("url")
 HTTP    = require('http')
+httpSync = require('httpsync')
 Zlib    = require("zlib")
 assert  = require("assert")
 
@@ -77,7 +78,7 @@ class Resources extends Array
     @push(resource)
     @browser.emit("request", request)
 
-    @runPipeline request, (error, response)=>
+    requestCallback = (error, response)=>
       if error
         resource.error = error
         callback(error)
@@ -92,8 +93,54 @@ class Resources extends Array
 
         @browser.emit("response", request, response)
         callback(null, resource.response)
-    return
 
+    requestHandlers = @pipeline.filter((fn)-> fn.length == 2)
+    responseHandlers = @pipeline.filter((fn)-> fn.length == 3)
+    response = null
+
+    # Called to execute the next request handler.
+    nextRequestHandler = (error, responseFromHandler)=>
+      if error
+        requestCallback(error)
+      else if responseFromHandler
+        # Received response, switch to processing request
+        response = responseFromHandler
+        # If we get redirected and the final handler doesn't provide a URL (e.g.
+        # mock response), then without this we end up with the original URL.
+        response.url ||= request.url
+        nextResponseHandler()
+      else
+        # Use the next request handler.
+        handler = requestHandlers.shift()
+        try
+          handler.call(@browser, request, nextRequestHandler)
+        catch error
+          requestCallback(error)
+
+    # Called to execute the next response handler.
+    nextResponseHandler = (error)=>
+      if error
+        requestCallback(error)
+      else
+        handler = responseHandlers.shift()
+        if handler
+          # Use the next response handler
+          try
+            handler.call(@browser, request, response, nextResponseHandler)
+          catch error
+            requestCallback(error)
+        else
+          # No more handlers, callback with response.
+          requestCallback(null, response)
+
+    if options["async"] == false
+        req = httpSync.request request
+        response = req.end()
+        response.body = response.data.toString()
+        nextRequestHandler null, response
+    else
+        @runPipeline request, requestCallback
+    return
 
 
   # GET request.

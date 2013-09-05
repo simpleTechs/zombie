@@ -33,7 +33,8 @@
     "q":                      "~0.9.6",
     "request":                "~2.26.0",
     "tough-cookie":           "~0.9.15",
-    "ws":                     "~0.4.29"
+    "ws":                     "~0.4.29",
+    "httpsync"
   },
   "devDependencies": {
     "coffee-script":          "~1.6.3",
